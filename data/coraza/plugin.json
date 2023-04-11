@@ -1,0 +1,28 @@
+{
+	"id": "coraza",
+	"order": 999,
+	"name": "Coraza",
+	"description": "Use Coraza as a library to inspect client request",
+	"version": "0.1",
+	"settings": {
+		"USE_CORAZA": {
+			"context": "multisite",
+			"default": "no",
+			"help": "Activate Coraza library",
+			"id": "use coraza library",
+			"label": "Coraza",
+			"regex": "^(no|yes)$",
+			"type": "check"
+		},
+        "CORAZA_API": {
+			"context": "global",
+			"default": "http://bunkerweb-golang-1:8080",
+			"help": "Address of the CORAZA API.",
+			"id": "coraza-api",
+			"label": "Coraza Api",
+			"regex": "^.*$",
+			"type": "text"
+		}
+
+	}
+}
