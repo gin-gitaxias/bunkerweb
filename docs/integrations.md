@@ -802,6 +802,53 @@ Repositories of Linux packages for BunkerWeb are available on [PackageCloud](htt
 	sudo dnf versionlock add bunkerweb
 	```
 
+=== "Redhat"
+
+    The first step is to add CentOS official repository. Create the following file at `/etc/yum.repos.d/centos.repo` :
+    ```conf
+    [centos]
+    name=CentOS-$releasever - Base
+    baseurl=http://mirror.centos.org/centos/$releasever/BaseOS/$basearch/os/
+    gpgcheck=1
+    enabled=1
+    gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+	```
+
+    The import the official GPG key of CentOS :
+    ```shell
+    rpm --import https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
+    ```
+
+      Go to NGINX 1.20.2 by first adding the official NGINX repository. Create the following file at /etc/yum.repos.d/nginx.repo :
+    ```conf
+    [nginx-stable]
+    name=nginx stable repo
+    baseurl=http://nginx.org/packages/rhel/$releasever/$basearch/
+    gpgcheck=1
+    enabled=1
+    gpgkey=https://nginx.org/keys/nginx_signing.key
+    module_hotfixes=true
+	```
+
+    You should now be able to install NGINX 1.20.2 :
+	```shell
+	sudo dnf install nginx-1.20.2-1.el8.ngx.x86_64
+	```
+
+	And finally install BunkerWeb 1.4.6 :
+    ```shell
+	dnf install -y epel-release && \
+    curl -s https://packagecloud.io/install/repositories/bunkerity/bunkerweb/script.rpm.sh | sudo bash && \
+    sudo dnf check-update && \
+    sudo dnf install -y bunkerweb-1.4.6
+    ```
+
+	To prevent upgrading NGINX and/or BunkerWeb packages when executing `dnf upgrade`, you can use the following command :
+	```shell
+	sudo dnf versionlock add nginx && \
+	sudo dnf versionlock add bunkerweb
+	```
+
 === "From source"
 
     The first step is to install NGINX 1.20.2 using the repository of your choice or by [compiling it from source](https://docs.nginx.com/nginx/admin-guide/installing-nginx/installing-nginx-open-source/#compiling-and-installing-from-source).
@@ -942,3 +989,92 @@ Configuration of BunkerWeb is done by using specific role variables :
 | `custom_plugins` | string | Path of the plugins directory to upload. | empty value |
 | `custom_www_owner` | string | Default owner for www files and folders. | `nginx` |
 | `custom_www_group` | string | Default group for www files and folders. | `nginx` |
+
+## Vagrant
+
+<figure markdown>
+  ![Overwiew](assets/img/integration-vagrant.svg){ align=center }
+  <figcaption>BunkerWeb integration with Vagrant</figcaption>
+</figure>
+
+List of supported providers :
+
+- vmware_desktop 
+- virtualbox 
+- libvirt
+
+**_Note on Supported Base Images_**  
+
+Please be aware that the provided Vagrant boxes are based **exclusively on Ubuntu 22.04 "Jammy"**. While BunkerWeb supports other Linux distributions, the Vagrant setup currently only supports Ubuntu 22.04 as the base operating system. This ensures a consistent and reliable environment for users who want to deploy BunkerWeb using Vagrant.
+
+Similar to other BunkerWeb integrations, the Vagrant setup uses **NGINX version 1.20.2**. This specific version is required to ensure compatibility and smooth functioning with BunkerWeb. Additionally, the Vagrant box includes **PHP** pre-installed, providing a ready-to-use environment for hosting PHP-based applications alongside BunkerWeb.
+
+By using the provided Vagrant box based on Ubuntu 22.04 "Jammy", you benefit from a well-configured and integrated setup, allowing you to focus on developing and securing your applications with BunkerWeb without worrying about the underlying infrastructure.
+
+Here are the steps to install BunkerWeb using Vagrant on Ubuntu with the supported virtualization providers (VirtualBox, VMware, and libvirt):
+
+
+1. Make sure you have Vagrant and one of the supported virtualization providers (VirtualBox, VMware, or libvirt) installed on your system.
+2. There are two ways to install the Vagrant box with BunkerWeb: either by using a provided Vagrantfile to configure your virtual machine or by creating a new box based on the existing BunkerWeb Vagrant box, offering you flexibility in how you set up your development environment.
+
+=== "Vagrantfile"
+
+    ```shell
+    Vagrant.configure("2") do |config|
+      config.vm.box = "bunkerity/bunkerity"
+    end
+    ```
+
+    Depending on the virtualization provider you choose, you may need to install additional plugins:
+
+    * For **VMware**, install the `vagrant-vmware-desktop` plugin. For more information, see the [Vagrant documentation](https://www.vagrantup.com/docs/providers).
+    * For **libvirt**, install the `vagrant-libvirt plugin`. For more information, see the [Vagrant documentation](https://www.vagrantup.com/docs/providers).
+    * For **VirtualBox**, install the `vagrant-vbguest` plugin. For more information, see the [Vagrant documentation](https://www.vagrantup.com/docs/providers).
+
+=== "New Vagrant Box"
+
+    ```shell
+    vagrant init bunkerity/bunkerity
+    ```
+
+    Depending on the virtualization provider you choose, you may need to install additional plugins:
+
+    * For **VMware**, install the `vagrant-vmware-desktop` plugin. For more information, see the [Vagrant documentation](https://www.vagrantup.com/docs/providers).
+    * For **libvirt**, install the `vagrant-libvirt plugin`. For more information, see the [Vagrant documentation](https://www.vagrantup.com/docs/providers).
+    * For **VirtualBox**, install the `vagrant-vbguest` plugin. For more information, see the [Vagrant documentation](https://www.vagrantup.com/docs/providers).
+
+After installing the necessary plugins for your chosen virtualization provider, run the following command to start the virtual machine and install BunkerWeb:
+
+```shell
+vagrant up --provider=virtualbox # or --provider=vmware_desktop or --provider=libvirt
+```
+
+Finally, to access the virtual machine using SSH, execute the following command:
+
+```shell
+vagrant ssh
+```
+
+**Example Vagrantfile**
+
+  Here is an example `Vagrantfile` for installing BunkerWeb on Ubuntu 22.04 "Jammy" using the different supported virtualization providers:
+
+```shell
+Vagrant.configure("2") do |config|
+
+  # Ubuntu 22.04 "Jammy"
+  config.vm.box = "bunkerity/bunkerity"
+
+  # Uncomment the desired virtualization provider
+  # For VirtualBox (default)
+  config.vm.provider "virtualbox"
+
+  # For VMware
+  # config.vm.provider "vmware_desktop" # Windows
+  # config.vm.provider "vmware_workstation" # Linux
+
+  # For libvirt
+  # config.vm.provider "libvirt"
+
+end
+```

@@ -1,4 +1,4 @@
-FROM python:3.11-alpine
+FROM python:3.11.3-alpine
 
 # Copy python requirements
 COPY src/common/gen/requirements.txt /tmp/req/requirements.txt
@@ -60,7 +60,7 @@ VOLUME /data /etc/nginx
 
 WORKDIR /usr/share/bunkerweb/autoconf
 
-USER root:nginx
+USER nginx:nginx
 
 HEALTHCHECK --interval=10s --timeout=10s --start-period=30s --retries=6 CMD /usr/share/bunkerweb/helpers/healthcheck-autoconf.sh
 

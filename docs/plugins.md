@@ -148,6 +148,14 @@ The first step is to install the plugin by putting the plugin files inside the c
 	ansible-playbook -i inventory.yml playbook.yml
 	```
 
+=== "Vagrant"
+
+    When using the [Vagrant integration](/1.4/integrations/#vagrant), plugins must be written to the `/etc/bunkerweb/plugins` folder :
+    ```shell
+    git clone https://github.com/bunkerity/bunkerweb-plugins && \
+    cp -rp ./bunkerweb-plugins/* /data/plugins
+    ```
+
 ## Writing a plugin
 
 !!! tip "Existing plugins"
@@ -182,7 +190,7 @@ A file named **plugin.json** and written at the root of the plugin folder must c
 			"regex": "^.*$",
 			"type": "text"
 		}
-	}
+	},
 	"jobs": [
 		{
 			"name": "my-job",
