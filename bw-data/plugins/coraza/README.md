@@ -77,7 +77,7 @@ CMD ["go", "run", "/app/."]
 | Setting      | Default                  | Description                                                                                    |
 | :----------: | :----------------------: | :--------------------------------------------------------------------------------------------- |
 | `USE_CORAZA` | `no`                     | When set to `yes`, requests will be checked by coraza.                      |
-| `CLAMAV_API` | `http://bunkerweb-golang-1:8090` | Address of the coraza library (request will be redirected there). |
+| `CORAZA_API` | `http://bunkerweb-golang-1:8090` | Address of the coraza library (request will be redirected there). |
 
 ! Disclamer the `CLAMAV_API` can't be modified only in the plugin.json you also need to change it in the main.go (bw-data/plugins/coraza/confs/main.go)
 this issue will be fixed later.
