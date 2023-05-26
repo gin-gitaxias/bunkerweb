@@ -1,26 +1,16 @@
+#!/usr/bin/python3
+
 from contextlib import contextmanager, suppress
 from copy import deepcopy
 from datetime import datetime
 from hashlib import sha256
-from logging import (
-    Logger,
-)
-from os import _exit, getenv, listdir
-from os.path import dirname
+from logging import Logger
+from os import _exit, getenv, listdir, sep
+from os.path import dirname, join
 from pathlib import Path
-from pymysql import install_as_MySQLdb
 from re import compile as re_compile
 from sys import path as sys_path
 from typing import Any, Dict, List, Optional, Tuple
-from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.exc import (
-    ArgumentError,
-    DatabaseError,
-    OperationalError,
-    ProgrammingError,
-    SQLAlchemyError,
-)
-from sqlalchemy.orm import scoped_session, sessionmaker
 from time import sleep
 from traceback import format_exc
 
@@ -40,10 +30,25 @@ from model import (
     Metadata,
 )
 
-if "/usr/share/bunkerweb/utils" not in sys_path:
-    sys_path.append("/usr/share/bunkerweb/utils")
+for deps_path in [
+    join(sep, "usr", "share", "bunkerweb", *paths)
+    for paths in (("deps", "python"), ("utils",))
+]:
+    if deps_path not in sys_path:
+        sys_path.append(deps_path)
 
-from jobs import file_hash
+from jobs import file_hash  # type: ignore
+
+from pymysql import install_as_MySQLdb
+from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.exc import (
+    ArgumentError,
+    DatabaseError,
+    OperationalError,
+    ProgrammingError,
+    SQLAlchemyError,
+)
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 install_as_MySQLdb()
 
@@ -292,7 +297,17 @@ class Database:
                         jobs = plugin.pop("jobs", [])
                         page = plugin.pop("page", False)
 
-                    to_put.append(Plugins(**plugin))
+                    to_put.append(
+                        Plugins(
+                            id=plugin["id"],
+                            name=plugin["name"],
+                            description=plugin["description"],
+                            version=plugin["version"],
+                            stream=plugin["stream"],
+                            external=plugin.get("external", False),
+                            method=plugin.get("method"),
+                        )
+                    )
 
                     for setting, value in settings.items():
                         value.update(
@@ -313,20 +328,25 @@ class Database:
                         to_put.append(Jobs(plugin_id=plugin["id"], **job))
 
                     if page:
+                        core_ui_path = Path(
+                            sep, "usr", "share", "bunkerweb", "core", plugin["id"], "ui"
+                        )
                         path_ui = (
-                            Path(f"/usr/share/bunkerweb/core/{plugin['id']}/ui")
-                            if Path(
-                                f"/usr/share/bunkerweb/core/{plugin['id']}/ui"
-                            ).exists()
-                            else Path(f"/etc/bunkerweb/plugins/{plugin['id']}/ui")
+                            core_ui_path
+                            if core_ui_path.exists()
+                            else Path(
+                                sep, "etc", "bunkerweb", "plugins", plugin["id"], "ui"
+                            )
                         )
 
                         if path_ui.exists():
                             if {"template.html", "actions.py"}.issubset(
                                 listdir(str(path_ui))
                             ):
-                                template = Path(f"{path_ui}/template.html").read_bytes()
-                                actions = Path(f"{path_ui}/actions.py").read_bytes()
+                                template = path_ui.joinpath(
+                                    "template.html"
+                                ).read_bytes()
+                                actions = path_ui.joinpath("actions.py").read_bytes()
 
                                 to_put.append(
                                     Plugin_pages(
@@ -439,7 +459,6 @@ class Database:
                                 if key != "SERVER_NAME" and (
                                     (key not in config and value == setting.default)
                                     or (key in config and value == config[key])
-                                    or (not value.strip() and not setting.default)
                                 ):
                                     continue
 
@@ -459,7 +478,6 @@ class Database:
                                 if key != "SERVER_NAME" and (
                                     (key not in config and value == setting.default)
                                     or (key in config and value == config[key])
-                                    or (not value.strip() and not setting.default)
                                 ):
                                     session.query(Services_settings).filter(
                                         Services_settings.service_id == server_name,
@@ -493,9 +511,7 @@ class Database:
                             )
 
                             if not global_value:
-                                if value == setting.default or (
-                                    not value.strip() and not setting.default
-                                ):
+                                if value == setting.default:
                                     continue
 
                                 to_put.append(
@@ -510,9 +526,7 @@ class Database:
                                 method in (global_value.method, "autoconf")
                                 and global_value.value != value
                             ):
-                                if value == setting.default or (
-                                    not value.strip() and not setting.default
-                                ):
+                                if value == setting.default:
                                     session.query(Global_values).filter(
                                         Global_values.setting_id == key,
                                         Global_values.suffix == suffix,
@@ -571,9 +585,7 @@ class Database:
                         )
 
                         if not global_value:
-                            if value == setting.default or (
-                                not value.strip() and not setting.default
-                            ):
+                            if value == setting.default:
                                 continue
 
                             to_put.append(
@@ -588,9 +600,7 @@ class Database:
                             global_value.method == method
                             and value != global_value.value
                         ):
-                            if value == setting.default or (
-                                not value.strip() and not setting.default
-                            ):
+                            if value == setting.default:
                                 session.query(Global_values).filter(
                                     Global_values.setting_id == key,
                                     Global_values.suffix == suffix,
@@ -856,7 +866,11 @@ class Database:
                         tmp_config.pop(key)
                     else:
                         tmp_config[key] = (
-                            {"value": value["value"], "global": True, "method": "default"}
+                            {
+                                "value": value["value"],
+                                "global": True,
+                                "method": "default",
+                            }
                             if methods is True
                             else value
                         )
@@ -1181,10 +1195,15 @@ class Database:
                                     Jobs.name == job["name"]
                                 ).update(updates)
 
+                    tmp_ui_path = Path(
+                        sep, "var", "tmp", "bunkerweb", "ui", plugin["id"], "ui"
+                    )
                     path_ui = (
-                        Path(f"/var/tmp/bunkerweb/ui/{plugin['id']}/ui")
-                        if Path(f"/var/tmp/bunkerweb/ui/{plugin['id']}/ui").exists()
-                        else Path(f"/etc/bunkerweb/plugins/{plugin['id']}/ui")
+                        tmp_ui_path
+                        if tmp_ui_path.exists()
+                        else Path(
+                            sep, "etc", "bunkerweb", "plugins", plugin["id"], "ui"
+                        )
                     )
 
                     if path_ui.exists():
@@ -1202,8 +1221,10 @@ class Database:
                             )
 
                             if not db_plugin_page:
-                                template = Path(f"{path_ui}/template.html").read_bytes()
-                                actions = Path(f"{path_ui}/actions.py").read_bytes()
+                                template = path_ui.joinpath(
+                                    "template.html"
+                                ).read_bytes()
+                                actions = path_ui.joinpath("actions.py").read_bytes()
 
                                 to_put.append(
                                     Plugin_pages(
@@ -1216,10 +1237,10 @@ class Database:
                                 )
                             else:
                                 updates = {}
-                                template_checksum = file_hash(
-                                    f"{path_ui}/template.html"
-                                )
-                                actions_checksum = file_hash(f"{path_ui}/actions.py")
+                                template_path = path_ui.joinpath("template.html")
+                                actions_path = path_ui.joinpath("actions.py")
+                                template_checksum = file_hash(str(template_path))
+                                actions_checksum = file_hash(str(actions_path))
 
                                 if (
                                     template_checksum
@@ -1227,9 +1248,7 @@ class Database:
                                 ):
                                     updates.update(
                                         {
-                                            Plugin_pages.template_file: Path(
-                                                f"{path_ui}/template.html"
-                                            ).read_bytes(),
+                                            Plugin_pages.template_file: template_path.read_bytes(),
                                             Plugin_pages.template_checksum: template_checksum,
                                         }
                                     )
@@ -1237,9 +1256,7 @@ class Database:
                                 if actions_checksum != db_plugin_page.actions_checksum:
                                     updates.update(
                                         {
-                                            Plugin_pages.actions_file: Path(
-                                                f"{path_ui}/actions.py"
-                                            ).read_bytes(),
+                                            Plugin_pages.actions_file: actions_path.read_bytes(),
                                             Plugin_pages.actions_checksum: actions_checksum,
                                         }
                                     )
@@ -1251,7 +1268,19 @@ class Database:
 
                     continue
 
-                to_put.append(Plugins(**plugin))
+                to_put.append(
+                    Plugins(
+                        id=plugin["id"],
+                        name=plugin["name"],
+                        description=plugin["description"],
+                        version=plugin["version"],
+                        stream=plugin["stream"],
+                        external=True,
+                        method=plugin["method"],
+                        data=plugin.get("data"),
+                        checksum=plugin.get("checksum"),
+                    )
+                )
 
                 for setting, value in settings.items():
                     db_setting = session.query(Settings).filter_by(id=setting).first()
@@ -1298,10 +1327,15 @@ class Database:
                     to_put.append(Jobs(plugin_id=plugin["id"], **job))
 
                 if page:
+                    tmp_ui_path = Path(
+                        sep, "var", "tmp", "bunkerweb", "ui", plugin["id"], "ui"
+                    )
                     path_ui = (
-                        Path(f"/var/tmp/bunkerweb/ui/{plugin['id']}/ui")
-                        if Path(f"/var/tmp/bunkerweb/ui/{plugin['id']}/ui").exists()
-                        else Path(f"/etc/bunkerweb/plugins/{plugin['id']}/ui")
+                        tmp_ui_path
+                        if tmp_ui_path.exists()
+                        else Path(
+                            sep, "etc", "bunkerweb", "plugins", plugin["id"], "ui"
+                        )
                     )
 
                     if path_ui.exists():
@@ -1319,8 +1353,10 @@ class Database:
                             )
 
                             if not db_plugin_page:
-                                template = Path(f"{path_ui}/template.html").read_bytes()
-                                actions = Path(f"{path_ui}/actions.py").read_bytes()
+                                template = path_ui.joinpath(
+                                    "template.html"
+                                ).read_bytes()
+                                actions = path_ui.joinpath("actions.py").read_bytes()
 
                                 to_put.append(
                                     Plugin_pages(
@@ -1333,10 +1369,10 @@ class Database:
                                 )
                             else:
                                 updates = {}
-                                template_checksum = file_hash(
-                                    f"{path_ui}/template.html"
-                                )
-                                actions_checksum = file_hash(f"{path_ui}/actions.py")
+                                template_path = path_ui.joinpath("template.html")
+                                actions_path = path_ui.joinpath("actions.py")
+                                template_checksum = file_hash(str(template_path))
+                                actions_checksum = file_hash(str(actions_path))
 
                                 if (
                                     template_checksum
@@ -1344,9 +1380,7 @@ class Database:
                                 ):
                                     updates.update(
                                         {
-                                            Plugin_pages.template_file: Path(
-                                                f"{path_ui}/template.html"
-                                            ).read_bytes(),
+                                            Plugin_pages.template_file: template_path.read_bytes(),
                                             Plugin_pages.template_checksum: template_checksum,
                                         }
                                     )
@@ -1354,9 +1388,7 @@ class Database:
                                 if actions_checksum != db_plugin_page.actions_checksum:
                                     updates.update(
                                         {
-                                            Plugin_pages.actions_file: Path(
-                                                f"{path_ui}/actions.py"
-                                            ).read_bytes(),
+                                            Plugin_pages.actions_file: actions_path.read_bytes(),
                                             Plugin_pages.actions_checksum: actions_checksum,
                                         }
                                     )
@@ -1574,7 +1606,7 @@ class Database:
             )
 
             if db_instance is not None:
-                return "An instance with the same hostname already exists."
+                return f"Instance {hostname} already exists, will not be added."
 
             session.add(
                 Instances(hostname=hostname, port=port, server_name=server_name)
